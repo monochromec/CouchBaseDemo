@@ -1,0 +1,24 @@
+{# base template #}
+<!DOCTYPE html>
+<html>
+
+<head>
+    {% block head %}
+    <title>{% block title %}{% endblock %} New Fashion Styles {{ config.APPNAME }}</title>
+    {% endblock %}
+    <!-- Latest compiled and minified CSS -->
+    <style>
+    div.container {
+      display:inline-block;
+    }
+    p {
+      text-align:center;
+    }
+    </style>
+</head>
+
+<body>
+{% block content %}{% endblock %}
+</body>
+
+</html>

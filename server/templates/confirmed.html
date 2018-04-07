@@ -1,0 +1,15 @@
+{% extends "layout.html" %}
+
+{% block title %}{{ config.APPNAME }} {% endblock %}
+{% block content %}
+{# Simple confirmation page: simply display the image alongside its name and a confirmation that it has entered the DB #}
+<div class="container">
+  <h4> New Model:</h4>
+<div>
+<div class="container">
+  <img src="{{ url_for('static', filename=model + '.png') }}" height="200"
+  width="200" align="left" alt="{{ model }}">
+  <center><b>{{ model }}</b></center>
+  <center><h4>Committed to DB storage!</h4></center>
+</div>
+{% endblock %}

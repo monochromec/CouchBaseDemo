@@ -1,0 +1,17 @@
+{% extends "layout.html" %}
+
+{% block title %}{{ config.APPNAME }} {% endblock %}
+{% block content %}
+<div class="container">
+  <h4> New Styles in Fashion:</h4>
+<div>
+  {# Walk through images as passed on from the landing page router function #}
+{% for i in imgs %}
+<div class="container">
+  <a href="{{ url_for('confirmed', filename=i [:-4]) }}">
+  <img src="{{ url_for('static', filename=i) }}" height="150"
+  width="150" align="left" alt="{{ i [:-4] }}">
+  <p><center><b>{{ i [:-4] }}</b></center></p></a>
+</div>
+{% endfor %}
+{% endblock %}

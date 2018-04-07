@@ -1,0 +1,14 @@
+{
+  "log": ["*"],
+  "databases": {
+    "db": {
+	"server": "http://couchbase-server:8091",
+	"bucket": "default",
+	"username": "couchbase",
+	"password": "couchbase",
+	"enable_shared_bucket_access": true,
+	"import_docs": "continuous", 
+	"users": { "couchbase": { "password": "couchbase", "disabled": false, "admin_channels": ["*"] } }
+    }
+  }
+}
