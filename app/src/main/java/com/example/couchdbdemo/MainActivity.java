@@ -35,17 +35,18 @@ public final class MainActivity extends AppCompatActivity {
 
     private Document mDoc;
     private Database mDB;
-    // Create global instance lock for DB synchronization
+    // Create global class instance lock for DB synchronization
     private Semaphore mLock = new Semaphore(0, true);
 
+    // Simple container for holding the image bitmap as well as the image name
     private final class Container {
         private byte [] img;
         private String name;
-
         public Container (String nP, byte [] iP) {
             img = iP;
             name = nP;
         }
+        // Didn't bother with Lombok :-)
         public String getName() {
             return name;
         }
@@ -54,6 +55,12 @@ public final class MainActivity extends AppCompatActivity {
         }
     }
 
+    // Helper class for asynchronous UI updates
+    // Implementation is straight forward: wait until the document has been updated
+    // (using the instance-wide lock) and then passing on the contents for display
+    // in the main UI thread via publishProgress
+    // A bit like Hotel California: you can check out any time you like but can never
+    // leave... :-)
     private final class WaitForDoc extends AsyncTask<Document, Document, Void> {
         @Override
         protected Void doInBackground(Document ... doc) {
@@ -66,6 +73,7 @@ public final class MainActivity extends AppCompatActivity {
                 publishProgress(doc [0]);
             }
         }
+        // Display updated document content in main UI thread
         @Override
         protected void onProgressUpdate(Document... doc) {
             super.onProgressUpdate(doc);
@@ -74,14 +82,14 @@ public final class MainActivity extends AppCompatActivity {
         }
     }
 
-    protected Database setupDB() {
+    // Set up CB instance: this is almost verbatim from the CB documentation
+    private Database setupDB() {
         Manager manager = null;
         try {
             manager = new Manager(new AndroidContext(getApplicationContext()), Manager.DEFAULT_OPTIONS);
         } catch (IOException e) {
             e.printStackTrace();
         };
-// Create or open the database named app
         Database database = null;
         try {
             database = manager.getDatabase("db");
@@ -89,9 +97,10 @@ public final class MainActivity extends AppCompatActivity {
             e.printStackTrace();
         }
 
-        // Create replicators to push & pull changes to & from Sync Gateway.
+        // Create replicators to pull changes from Sync Gateway.
         URL url = null;
         try {
+            // Slot in the IP address of the server running the Sync Gateway container (or real instance) here
             url = new URL("http://<your IP here>:4984/db");
         } catch (MalformedURLException e) {
             e.printStackTrace();
@@ -99,12 +108,15 @@ public final class MainActivity extends AppCompatActivity {
         Authenticator auth = new AuthenticatorFactory().createBasicAuthenticator("couchbase", "couchbase");
         Replication pull = database.createPullReplication(url);
         pull.setAuthenticator(auth);
+        // This is the important bit: tell the Sync Gateway to continously update our instance upon change
         pull.setContinuous(true);
         pull.start();
         return database;
     }
 
-    protected Document getDoc(Database db) {
+    // Get document from synced bucket via the Sync Gateway based on DocID and setLimit (as we
+    // only have one instance with this ID :-)
+    private Document getDoc(Database db) {
         Query query = db.createAllDocumentsQuery();
         query.setStartKeyDocId("fashionPic");
         query.setLimit(1);
@@ -115,20 +127,25 @@ public final class MainActivity extends AppCompatActivity {
             e.printStackTrace();
         }
 
-        //   Document doc = database.getDocument("fashionPic");
-        // Map<String, Object> props = doc.getProperties();
         QueryRow row = rows.next();
         Document doc = row.getDocument();
+        // In member function definition for AsyncTask
         doc.addChangeListener(new Document.ChangeListener() {
             // Increase lock counter signaling changed document
             @Override
             public void changed(Document.ChangeEvent event) {
+                // Tell AsyncTask that we have updated content
                 mLock.release();
             }
         });
         return doc;
     }
-    protected Container extractDoc (Document doc) {
+
+    // Extract bitmap and name into container from document
+    // Essentially this means reversing the actions from the server side (decoding
+    // and inflating the bitmap string) and finally creating a helper container instance which
+    // is returned to the caller
+    private Container extractDoc (Document doc) {
         byte [] bytes = null;
         String name = null;
         try {
@@ -155,11 +172,15 @@ public final class MainActivity extends AppCompatActivity {
         return new Container(name, img);
     }
 
+    // Simple helper function to display the content of a container:
+    // Create ImageView to hold the image bitmap and print the image
+    // name below it based on the Textview in the layout in activity_main.xml
     private void displayContainer(Container cont) {
         ImageView view = (ImageView) findViewById(R.id.imageDisplay);
         view.setScaleType(ImageView.ScaleType.FIT_CENTER);
 
         byte [] img = cont.getImg();
+        // Standard textbook bitmap creation
         Bitmap bm = BitmapFactory.decodeByteArray(img, 0, img.length);
         view.setImageBitmap(bm);
 
@@ -167,6 +188,11 @@ public final class MainActivity extends AppCompatActivity {
         text.setText(cont.getName());
     }
 
+    // Start the whole thing up:
+    // Retrieve the first image including its name from the Sync Gateway using the
+    // above helper functions and then create an instance derived from AsyncTask to
+    // display any incoming updated from the Sync Gateway (note the loop *inside* the
+    // doInBackground member function in WaitForDoc)
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -177,7 +203,7 @@ public final class MainActivity extends AppCompatActivity {
         // Get first image and display on screen
         Container cont = extractDoc(mDoc);
         displayContainer(cont);
-        // Enter infinite background loop waiting for doc update via lock
+        // Enter infinite background loop waiting for doc update via lock in doInBackground in WaitForDoc
         WaitForDoc task = new WaitForDoc();
         task.execute(mDoc, mDoc);
     }

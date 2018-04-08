@@ -16,13 +16,20 @@ APPNAME = 'ProductCatalog'
 STATIC_FOLDER = 'static'
 
 # Description: Get all images ending in PNG in static content folder
+# If other image formats are required, modify the loop
 # Parameters:
 #   DIRECTORY: location of content folder
 # Return value: list of image file names
 
 def getImages(directory=STATIC_FOLDER):
-    return [ fn for fn in os.listdir(directory)
-             if os.path.isfile(os.path.join(directory, fn)) and fn.endswith('.png') ]
+    exts = ['png']
+    ret = []
+    for fn in os.listdir(directory):
+        fName = os.path.basename(fn)
+        ext = fName.split('.', -1)
+        if os.path.isfile(os.path.join(directory, fn)) and ext [1] in exts:
+            ret.append(fn)
+    return ret
 
 # Description: Store name and image bitmap in CB bucket
 # Parameters:
