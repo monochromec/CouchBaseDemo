@@ -76,4 +76,4 @@ def confirmed():
     return render_template('confirmed.html', model=model)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run('CB demo')
