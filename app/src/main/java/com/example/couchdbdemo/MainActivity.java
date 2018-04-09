@@ -1,6 +1,9 @@
 package com.example.couchdbdemo;
 
+import android.content.DialogInterface;
 import android.os.AsyncTask;
+import android.os.Handler;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.graphics.Bitmap;
@@ -35,6 +38,7 @@ public final class MainActivity extends AppCompatActivity {
 
     private Document mDoc;
     private Database mDB;
+    private boolean mFirst = true;
     // Create global class instance lock for DB synchronization
     private Semaphore mLock = new Semaphore(0, true);
 
@@ -53,6 +57,23 @@ public final class MainActivity extends AppCompatActivity {
         public byte[] getImg() {
             return img;
         }
+    }
+
+    // Show error message if no document is present in Sync GW DB
+    private void showError() {
+        AlertDialog.Builder build = new AlertDialog.Builder(this);
+        build.setTitle(R.string.app_name);
+        build.setMessage("Error: no document present in DB")
+                .setCancelable(false)
+                .setPositiveButton("Ok", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        dialog.dismiss();
+                        finish();
+                        // System.exit(-1);
+                    }
+                });
+       build.create().show();
     }
 
     // Helper class for asynchronous UI updates
@@ -81,7 +102,20 @@ public final class MainActivity extends AppCompatActivity {
             displayContainer(cont);
         }
     }
-
+    // Create seperate thread for broken dialog processing onCreate as dialogs cannot be created
+    // here :-(
+    private final class WaitForDialog extends AsyncTask<Void, Void, Void> {
+        @Override
+        protected Void doInBackground(Void ... p) {
+            return null;
+        }
+        // Display updated document content in main UI thread
+        @Override
+        protected void onPostExecute(Void p) {
+            super.onProgressUpdate(p);
+            showError();
+        }
+    }
     // Set up CB instance: this is almost verbatim from the CB documentation
     private Database setupDB() {
         Manager manager = null;
@@ -89,7 +123,7 @@ public final class MainActivity extends AppCompatActivity {
             manager = new Manager(new AndroidContext(getApplicationContext()), Manager.DEFAULT_OPTIONS);
         } catch (IOException e) {
             e.printStackTrace();
-        };
+        }
         Database database = null;
         try {
             database = manager.getDatabase("db");
@@ -101,7 +135,7 @@ public final class MainActivity extends AppCompatActivity {
         URL url = null;
         try {
             // Slot in the IP address of the server running the Sync Gateway container (or real instance) here
-            url = new URL("http://<your IP here>:4984/db");
+            url = new URL("http://<server IP>:4984/db");
         } catch (MalformedURLException e) {
             e.printStackTrace();
         }
@@ -121,14 +155,23 @@ public final class MainActivity extends AppCompatActivity {
         query.setStartKeyDocId("fashionPic");
         query.setLimit(1);
         QueryEnumerator rows = null;
+        Document doc = null;
         try {
             rows = query.run();
+            QueryRow row = rows.next();
+            if (row != null) {
+                doc = row.getDocument();
+            }
         } catch (CouchbaseLiteException e) {
             e.printStackTrace();
         }
 
-        QueryRow row = rows.next();
-        Document doc = row.getDocument();
+        if (doc == null && mFirst) {
+            // Create dialog in background if doc is not present
+            WaitForDialog dia = new WaitForDialog();
+            dia.execute();
+            return doc;
+        }
         // In member function definition for AsyncTask
         doc.addChangeListener(new Document.ChangeListener() {
             // Increase lock counter signaling changed document
@@ -145,7 +188,7 @@ public final class MainActivity extends AppCompatActivity {
     // Essentially this means reversing the actions from the server side (decoding
     // and inflating the bitmap string) and finally creating a helper container instance which
     // is returned to the caller
-    private Container extractDoc (Document doc) {
+    private Container extractDoc(Document doc) {
         byte [] bytes = null;
         String name = null;
         try {
@@ -198,11 +241,17 @@ public final class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         setTitle("  Latest Fashion Updates");
+
         mDB = setupDB();
         mDoc = getDoc(mDB);
+        // Exit onCreate if doc is empty
+        if (mDoc == null) {
+            return;
+        }
         // Get first image and display on screen
         Container cont = extractDoc(mDoc);
         displayContainer(cont);
+        mFirst = false;
         // Enter infinite background loop waiting for doc update via lock in doInBackground in WaitForDoc
         WaitForDoc task = new WaitForDoc();
         task.execute(mDoc, mDoc);
