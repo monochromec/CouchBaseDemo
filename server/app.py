@@ -38,7 +38,7 @@ def getImages(directory=STATIC_FOLDER):
 
 def storeImageInCB(buf0, name):
 # Default credentials
-    auth = PasswordAuthenticator('Administrator', 'couchbase')
+    auth = PasswordAuthenticator('couchbase', 'couchbase')
     cluster = Cluster('couchbase://localhost')
     cluster.authenticate(auth)
     bucket = cluster.open_bucket('default')
